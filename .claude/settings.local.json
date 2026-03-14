@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/Drive_D/py_fov\" && uv run python -c \"import ast; ast.parse\\(open\\('fov/gl_view.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
+    ]
+  }
+}
