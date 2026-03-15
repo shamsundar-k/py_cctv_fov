@@ -6,7 +6,7 @@ from PySide6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QPolygonF
 
 from . import theme as _theme
 from .theme import TH
-from .constants import DORI_HEX
+from .constants import DORI_HEX, BLIND_SPOT_HEX, BLIND_SPOT_RGBA
 
 
 class Views2D(QWidget):
@@ -90,6 +90,20 @@ class Views2D(QWidget):
         # Ground line
         p.setPen(QPen(QColor(TH("ground")), 1.5))
         p.drawLine(int(wx(0)), int(wy(0)), int(wx(max_d)), int(wy(0)))
+
+        # Blind spot triangle
+        if D_near > 0.1:
+            bsc = QColor(BLIND_SPOT_HEX)
+            bsc.setAlpha(90)
+            bs_pts = [QPointF(wx(0), wy(cam_h)),
+                      QPointF(wx(D_near), wy(0)),
+                      QPointF(wx(0), wy(0))]
+            p.setBrush(QBrush(bsc)); p.setPen(Qt.NoPen)
+            p.drawPolygon(QPolygonF(bs_pts))
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor(BLIND_SPOT_HEX), 1.5, Qt.DotLine))
+            p.drawPolygon(QPolygonF(bs_pts))
+            self._draw_label(p, wx(D_near/3)-10, wy(cam_h/3), "Blind Spot", BLIND_SPOT_HEX, 7, bold=False)
 
         # DORI zone polygons
         zone_order = [
@@ -236,6 +250,19 @@ class Views2D(QWidget):
         cam_px, cam_py = w2p(0, 0); far_cx, far_cy = w2p(rf, 0)
         p.setPen(QPen(QColor(TH("fov_near")), 1, Qt.DotLine))
         p.drawLine(int(cam_px), int(cam_py), int(far_cx), int(far_cy))
+
+        # Blind Spot
+        if D_near > 0.1:
+            th = math.tan(hh)
+            bsc = QColor(BLIND_SPOT_HEX)
+            bsc.setAlpha(90)
+            p1x, p1y = w2p(D_near, -D_near*th); p2x, p2y = w2p(D_near,  D_near*th)
+            poly = QPolygonF([QPointF(cam_px, cam_py), QPointF(p1x, p1y), QPointF(p2x, p2y)])
+            p.setBrush(QBrush(bsc)); p.setPen(Qt.NoPen); p.drawPolygon(poly)
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor(BLIND_SPOT_HEX), 1.2, Qt.DotLine)); p.drawPolygon(poly)
+            mx, my = w2p(D_near/2, 0)
+            self._draw_label(p, mx-14, my-5, "Blind Spot", BLIND_SPOT_HEX, 7, bold=False)
 
         # DORI zones
         zone_order = [

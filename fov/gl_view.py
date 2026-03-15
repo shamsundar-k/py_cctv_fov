@@ -6,7 +6,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import gluPerspective, gluLookAt, gluProject
 
-from .constants import DORI_RGBA, DORI_SOLID, DORI_HEX
+from .constants import DORI_RGBA, DORI_SOLID, DORI_HEX, BLIND_SPOT_RGBA, BLIND_SPOT_HEX, BLIND_SPOT_SOLID
 
 
 class GLView(QOpenGLWidget):
@@ -73,6 +73,7 @@ class GLView(QOpenGLWidget):
         b = self.bearing
         self._ground(geo)
         self._grid(geo)
+        self._blind_spot_3d(geo, b)
         self._dori_zones_3d(geo, b)
         self._fov_outline_3d(geo, b)
         self._target_line(geo, b)
@@ -149,6 +150,57 @@ class GLView(QOpenGLWidget):
         while y <= s+.01:
             glVertex3f(-s, y, .002); glVertex3f(s, y, .002); y += step
         glEnd()
+
+    def _blind_spot_3d(self, geo, b):
+        dn = geo["D_near"]
+        H  = geo["H"]
+        if dn <= 0.1: return
+
+        # Ground corners at D_near
+        n = self._frustum_3d_corners(dn, geo, b)   # [BL, BR, TR, TL]
+        cam = (0.0, 0.0, H)
+        pole_base = (0.0, 0.0, 0.0)
+
+        r, g, bv, a = BLIND_SPOT_RGBA
+        glDepthMask(GL_FALSE)
+
+        # ── Filled Faces ──────────────────────────────────────────────────
+        # Ground triangle (pole base to near edge)
+        glColor4f(r, g, bv, a * 0.6)
+        glBegin(GL_TRIANGLES)
+        glVertex3f(*pole_base); glVertex3f(*n[0]); glVertex3f(*n[1])
+        glEnd()
+
+        # Side faces of the "dead wedge"
+        glColor4f(r, g, bv, a * 0.45)
+        glBegin(GL_TRIANGLES)
+        # Left side: cam -> pole_base -> BL
+        glVertex3f(*cam); glVertex3f(*pole_base); glVertex3f(*n[0])
+        # Right side: cam -> pole_base -> BR
+        glVertex3f(*cam); glVertex3f(*pole_base); glVertex3f(*n[1])
+        glEnd()
+
+        # Back face (under the near FOV face): cam -> BL -> BR
+        glColor4f(r, g, bv, a * 0.55)
+        glBegin(GL_TRIANGLES)
+        glVertex3f(*cam); glVertex3f(*n[0]); glVertex3f(*n[1])
+        glEnd()
+
+        glDepthMask(GL_TRUE)
+
+        # ── Outline ───────────────────────────────────────────────────────
+        glColor4f(*BLIND_SPOT_SOLID); glLineWidth(2.0)
+        glBegin(GL_LINE_LOOP)
+        glVertex3f(*pole_base); glVertex3f(*n[0]); glVertex3f(*n[1])
+        glEnd()
+        glBegin(GL_LINES)
+        glVertex3f(*cam); glVertex3f(*n[0])
+        glVertex3f(*cam); glVertex3f(*n[1])
+        glEnd()
+
+        # Label at midpoint of blind spot
+        mx = (n[0][0]+n[1][0])/4; my = (n[0][1]+n[1][1])/4
+        self._labels.append((mx, my, 0.0, "Blind Spot", BLIND_SPOT_HEX))
 
     def _dori_zones_3d(self, geo, b):
         dn   = geo["D_near"]
