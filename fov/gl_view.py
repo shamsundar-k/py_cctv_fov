@@ -269,12 +269,12 @@ class GLView(QOpenGLWidget):
             glVertex3f(*c[0]); glVertex3f(*c[3])
             glVertex3f(*c[1]); glVertex3f(*c[2])
             glEnd()
-        glDisable(GL_LINE_SMOOTH)
             # Label at midpoint on the ground
             mx = (c[0][0]+c[1][0])/2; my = (c[0][1]+c[1][1])/2
             sfx = "" if info["within_render"] else "*"
             self._labels.append((mx, my, 0.0,
                 f"{level[:5]}. {de:.1f}m{sfx}", DORI_HEX[level]))
+        glDisable(GL_LINE_SMOOTH)
 
     def _fov_outline_3d(self, geo, b):
         dn  = geo["D_near"]
