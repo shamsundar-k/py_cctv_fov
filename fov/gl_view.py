@@ -50,7 +50,11 @@ class GLView(QOpenGLWidget):
     def initializeGL(self):
         glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glEnable(GL_LINE_SMOOTH)
+        # GL_LINE_SMOOTH is NOT enabled globally: on Ubuntu/Mesa it implicitly
+        # activates polygon-smooth coverage which overrides glColor4f alpha for
+        # filled quads and causes all DORI zones to render as the first zone's
+        # colour (green).  We enable it only locally around actual line draws.
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
         glClearColor(0.10, 0.10, 0.16, 1.0)
 
     def resizeGL(self, w, h): glViewport(0, 0, w, max(h, 1))
@@ -118,6 +122,7 @@ class GLView(QOpenGLWidget):
         if dist < 0.01: return
         nx, ny, nz = dx/dist, dy/dist, dz/dist
         t = 0.0; drawing = True
+        glEnable(GL_LINE_SMOOTH)
         glBegin(GL_LINES)
         while t < dist:
             seg = dash if drawing else gap
@@ -127,6 +132,7 @@ class GLView(QOpenGLWidget):
                 glVertex3f(p0[0]+nx*t2, p0[1]+ny*t2, p0[2]+nz*t2)
             t = t2; drawing = not drawing
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
     # ── Scene elements ─────────────────────────────────────────────────────────
 
@@ -142,6 +148,7 @@ class GLView(QOpenGLWidget):
         s    = max(geo["render_far"]*2.2, 20)
         step = max(1.0, round(s/15))
         glColor4f(0.22, 0.22, 0.38, 0.8); glLineWidth(0.5)
+        glEnable(GL_LINE_SMOOTH)
         glBegin(GL_LINES)
         x = -s
         while x <= s+.01:
@@ -150,6 +157,7 @@ class GLView(QOpenGLWidget):
         while y <= s+.01:
             glVertex3f(-s, y, .002); glVertex3f(s, y, .002); y += step
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
     def _blind_spot_3d(self, geo, b):
         dn = geo["D_near"]
@@ -296,6 +304,7 @@ class GLView(QOpenGLWidget):
         glDepthMask(GL_TRUE)
 
         # ── DORI zone boundary lines and labels ───────────────────────────────
+        glEnable(GL_LINE_SMOOTH)
         for level, info in dori.items():
             de = info["D_effective"]
             if de <= dn + .01: continue
@@ -317,6 +326,7 @@ class GLView(QOpenGLWidget):
             sfx = "" if info["within_render"] else "*"
             self._labels.append((mx, my, 0.0,
                 f"{level[:5]}. {de:.1f}m{sfx}", DORI_HEX[level]))
+        glDisable(GL_LINE_SMOOTH)
 
     def _fov_outline_3d(self, geo, b):
         dn  = geo["D_near"]
@@ -326,6 +336,8 @@ class GLView(QOpenGLWidget):
 
         n = self._frustum_3d_corners(dn, geo, b)   # near: [BL, BR, TR, TL]
         f = self._frustum_3d_corners(df, geo, b)   # far:  [BL, BR, TR, TL]
+
+        glEnable(GL_LINE_SMOOTH)
 
         # ── 4 corner rays: camera → far corners (solid cyan) ──────────────────
         glColor4f(0.0, 0.85, 0.85, 1.0); glLineWidth(1.8)
@@ -364,9 +376,12 @@ class GLView(QOpenGLWidget):
         glVertex3f(*n[2]); glVertex3f(*f[2])
         glEnd()
 
+        glDisable(GL_LINE_SMOOTH)
+
     def _target_line(self, geo, b):
         td = geo["target_dist"]; th = geo["target_h"]
         c  = self._frustum_3d_corners(td, geo, b)
+        glEnable(GL_LINE_SMOOTH)
         # Yellow ground line at target distance
         glColor4f(1, 1, 0, 0.9); glLineWidth(2.0)
         glBegin(GL_LINES)
@@ -379,6 +394,7 @@ class GLView(QOpenGLWidget):
         glBegin(GL_LINES)
         glVertex3f(cx, cy, 0); glVertex3f(cx, cy, th)
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
         self._labels.append((cx+0.2, cy, 0.0, f"Tgt H {th:.1f}m", "#00dddd"))
         self._labels.append((c[0][0], c[0][1], 0.0, f"Tgt D {td:.0f}m", "#dddd00"))
 
@@ -388,10 +404,12 @@ class GLView(QOpenGLWidget):
         fx   = math.sin(brad); fy = math.cos(brad)
 
         # Mounting pole
+        glEnable(GL_LINE_SMOOTH)
         glColor4f(0.55, 0.55, 0.55, 1); glLineWidth(2.5)
         glBegin(GL_LINES)
         glVertex3f(0, 0, 0); glVertex3f(0, 0, H)
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
         # Camera body — slightly elongated box oriented along bearing
         s = 0.20   # half-size
@@ -411,10 +429,12 @@ class GLView(QOpenGLWidget):
         for face in faces:
             for i in face: glVertex3f(*corners[i])
         glEnd()
+        glEnable(GL_LINE_SMOOTH)
         glColor4f(0.4, 0.4, 0.4, 1); glLineWidth(1.2)
         glBegin(GL_LINE_LOOP)
         for i in faces[0]:  glVertex3f(*corners[i])
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
         # Lens nub on the front face
         ns = 0.09
@@ -423,10 +443,12 @@ class GLView(QOpenGLWidget):
         self._box(lc[0] + fx*ns, lc[1] + fy*ns, lc[2], ns)
 
         # Bearing direction indicator (teal line)
+        glEnable(GL_LINE_SMOOTH)
         glColor4f(0, 0.85, 0.85, 1); glLineWidth(2)
         glBegin(GL_LINES)
         glVertex3f(0, 0, H); glVertex3f(fx*.6, fy*.6, H)
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
         self._labels.append((0.3, 0, 0.0, f"H={H:.1f}m", "#dddddd"))
 
@@ -441,19 +463,23 @@ class GLView(QOpenGLWidget):
 
     def _north(self, geo):
         d = min(geo["render_far"]*.2, 6)
+        glEnable(GL_LINE_SMOOTH)
         glColor4f(0, 0.9, 0.5, 1); glLineWidth(2)
         glBegin(GL_LINES)
         glVertex3f(0, 0, .05); glVertex3f(0, d, .05)
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
         self._labels.append((0, d+.4, 0.0, "N", "#00ee88"))
 
     def _axes(self, geo):
         L = min(geo["render_far"]*.1, 3); glLineWidth(2)
+        glEnable(GL_LINE_SMOOTH)
         glBegin(GL_LINES)
         glColor4f(1, 0.3, 0.3, 1); glVertex3f(0, 0, 0); glVertex3f(L, 0, 0)
         glColor4f(0.3, 1, 0.3, 1); glVertex3f(0, 0, 0); glVertex3f(0, L, 0)
         glColor4f(0.3, 0.3, 1, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, L)
         glEnd()
+        glDisable(GL_LINE_SMOOTH)
 
     def paintEvent(self, e):
         super().paintEvent(e)
